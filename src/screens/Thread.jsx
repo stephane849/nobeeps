@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Icon } from '../icons';
-import { StatusBar, Header, Wave } from '../ui';
+import { Header, Wave } from '../ui';
 import { DATA } from '../data';
 import { Beeper, poll } from '../beeper';
 
@@ -17,11 +17,7 @@ export function Thread({ nav, route, t }) {
     const stop = poll(async () => {
       const live = await Beeper.getMessages(id);
       if (!alive) return;
-      if (live) {
-        setMsgs(live);
-      } else if (!loaded) {
-        setMsgs(DATA.THREADS[id] || [{ day: "Today" }]);
-      }
+      if (live) setMsgs(live);
       loaded = true;
     }, 5000);
     return () => { alive = false; stop(); };
@@ -45,7 +41,6 @@ export function Thread({ nav, route, t }) {
 
   return (
     <React.Fragment>
-      <StatusBar label="" />
       <Header
         title={c ? c.name : id}
         sub={t.noReceipts ? (c?.group ? c?.num : "Reply when you can") : "online"}
@@ -77,7 +72,12 @@ export function Thread({ nav, route, t }) {
               </div>
             );
           })}
-          {t.mindful && (
+          {rows.length === 0 && (
+            <div className="center-note" style={{ minHeight: 160 }}>
+              {msgs === null ? "Loading…" : "No messages yet. Say hello."}
+            </div>
+          )}
+          {t.mindful && rows.length > 0 && (
             <div className="daystamp" style={{ borderStyle: "dashed", opacity: .7 }}>
               Held until 16:30 · arrives calmly
             </div>

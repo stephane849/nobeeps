@@ -550,4 +550,5 @@ code{font-family:ui-monospace,Menlo,monospace;font-size:.92em;
   height: 100%;
   border-radius: 0;
   box-shadow: none;
+  padding-top: env(safe-area-inset-top, 0px);
 }

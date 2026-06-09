@@ -1,39 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { Icon } from '../icons';
-import { StatusBar, Header, Avatar, NetTag } from '../ui';
-import { DATA } from '../data';
+import { Header, Avatar, NetTag } from '../ui';
 import { useBeeper, Beeper, poll } from '../beeper';
 
 export function ChatList({ nav, t }) {
   const bridge = useBeeper();
   const [live, setLive] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!bridge.connected) { setLive(null); return; }
+    if (!bridge.connected) { setLive(null); setLoading(false); return; }
     let alive = true;
+    setLoading(true);
     const stop = poll(async () => {
       const arr = await Beeper.getChats();
-      if (alive && arr) setLive(arr);
+      if (!alive) return;
+      setLoading(false);
+      if (arr) setLive(arr);
     }, 10000);
     return () => { alive = false; stop(); };
   }, [bridge.connected]);
 
-  let rows = live || DATA.CHATS.map(c => {
-    const p = DATA.byId[c.id];
-    return {
-      id: c.id, name: p.name, initials: p.initials, unread: c.unread,
-      time: c.time, snippet: c.snippet, group: c.group, pinned: c.pinned, network: c.network
-    };
-  });
-  if (bridge.connected && bridge.connectedNets) {
-    rows = rows.filter(c => !c.network || bridge.connectedNets.includes(c.network));
-  }
+  const rows = live || [];
   const netsShown = new Set(rows.map(c => c.network).filter(Boolean));
   const showTags = netsShown.size > 1;
 
   return (
     <React.Fragment>
-      <StatusBar label="Messages" />
       <Header
         title="Messages"
         right={
@@ -47,14 +40,14 @@ export function ChatList({ nav, t }) {
       {!bridge.connected && (
         <button className="bridge-cta" onClick={() => nav("settings")}>
           <Icon.People size={18} />
-          <span>Connect WhatsApp or Telegram through a Beeper bridge</span>
+          <span>Connect WhatsApp or Telegram to get started</span>
           <Icon.Chevron size={18} style={{ opacity: .5 }} />
         </button>
       )}
-      {t.mindful && (
+      {t.mindful && rows.length > 0 && (
         <div className="batch-banner">
           <Icon.Clock size={17} sw={1.8} />
-          <span><span className="next">Next delivery 16:30</span> · 3 messages waiting quietly</span>
+          <span><span className="next">Next delivery 16:30</span> · messages waiting quietly</span>
         </div>
       )}
       <div className="body">
@@ -76,12 +69,20 @@ export function ChatList({ nav, t }) {
             </span>
           </button>
         ))}
-        <div className="center-note" style={{ minHeight: 120 }}>
-          {bridge.connected
-            ? (bridge.demo ? "Bridge linked · showing demo data (Beeper API not reachable from here)."
-              : "You're all caught up. Nothing else needs you right now.")
-            : "You're all caught up. Nothing else needs you right now."}
-        </div>
+        {bridge.connected && rows.length === 0 && (
+          <div className="center-note" style={{ minHeight: 200 }}>
+            {loading ? "Loading messages…" : "No messages yet. You're all caught up."}
+          </div>
+        )}
+        {!bridge.connected && (
+          <div className="center-note" style={{ minHeight: 200, flexDirection: "column", gap: 16 }}>
+            <span>No messages yet.</span>
+            <button className="btn btn--solid" style={{ width: "auto", padding: "12px 24px" }}
+              onClick={() => nav("settings")}>
+              Connect an account
+            </button>
+          </div>
+        )}
       </div>
       <TabBar nav={nav} active="messages" />
     </React.Fragment>

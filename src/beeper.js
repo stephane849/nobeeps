@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 const LS_KEY = "mudita_beeper_v2";
-export const DEFAULT_BASE = "http://127.0.0.1:23373";
+export const DEFAULT_BASE = "";
 
 export const NETWORKS = {
   whatsapp: {
@@ -77,7 +77,10 @@ function headers() {
   if (state.token) h["Authorization"] = "Bearer " + state.token;
   return h;
 }
-function urlFor(path) { return state.baseUrl.replace(/\/$/, "") + path; }
+function urlFor(path) {
+  if (!state.baseUrl) throw new Error("No Beeper endpoint configured");
+  return state.baseUrl.replace(/\/$/, "") + path;
+}
 
 async function req(path, opts = {}, timeout = 4000) {
   const ctrl = new AbortController();

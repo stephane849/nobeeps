@@ -1,20 +1,7 @@
 import React from 'react';
 import { Icon } from './icons';
 
-export function StatusBar({ label = "WhatsApp", dnd = true }) {
-  return (
-    <div className="statusbar">
-      <span>{label}</span>
-      <div className="sb-right">
-        {dnd && <Icon.Moon size={15} sw={1.6} />}
-        <span>14:02</span>
-        <span className="sb-batt">
-          <span className="sb-batt__shell"><span className="sb-batt__fill" style={{ width: "72%" }} /></span>
-        </span>
-      </div>
-    </div>
-  );
-}
+export function StatusBar() { return null; }
 
 export function Header({ title, sub, onBack, right }) {
   return (

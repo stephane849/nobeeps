@@ -1,41 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
+import QRCode from 'qrcode';
 import { Icon } from '../icons';
-import { StatusBar, Header, NetGlyph } from '../ui';
+import { Header, NetGlyph } from '../ui';
 import { Beeper, useBeeper, NETWORKS } from '../beeper';
 
-function FauxQR({ seed = "mudita", size = 25 }) {
-  const cells = [];
-  let h = 2166136261;
-  function rng(i) {
-    let x = (h ^ (i * 2654435761)) >>> 0;
-    x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0;
-    return (x % 100) / 100;
-  }
-  for (let i = 0; i < seed.length; i++) { h = (h ^ seed.charCodeAt(i)) * 16777619 >>> 0; }
-  function isFinder(r, c) {
-    const inBox = (R, C) => r >= R && r < R + 7 && c >= C && c < C + 7;
-    const ring = (R, C) => { const rr = r - R, cc = c - C; return rr === 0 || rr === 6 || cc === 0 || cc === 6 || (rr >= 2 && rr <= 4 && cc >= 2 && cc <= 4); };
-    if (inBox(0, 0)) return ring(0, 0);
-    if (inBox(0, size - 7)) return ring(0, size - 7);
-    if (inBox(size - 7, 0)) return ring(size - 7, 0);
-    return null;
-  }
-  for (let r = 0; r < size; r++) {
-    for (let c = 0; c < size; c++) {
-      const f = isFinder(r, c);
-      const on = f === null ? rng(r * size + c) > 0.5 : f;
-      cells.push(<div key={r + "-" + c} style={{ background: on ? "var(--ink)" : "var(--paper)" }} />);
-    }
-  }
-  return (
-    <div style={{
-      display: "grid", gridTemplateColumns: `repeat(${size},1fr)`,
-      width: 240, height: 240, border: "6px solid var(--paper)",
-      boxShadow: "0 0 0 2px var(--ink)", background: "var(--paper)"
-    }}>
-      {cells}
-    </div>
-  );
+function RealQR({ data }) {
+  const canvasRef = useRef(null);
+  const isImage = data && (data.startsWith('data:image') || data.startsWith('http'));
+
+  useEffect(() => {
+    if (!data || isImage || !canvasRef.current) return;
+    QRCode.toCanvas(canvasRef.current, data, {
+      width: 240, margin: 2,
+      color: { dark: '#000000', light: '#ffffff' },
+    });
+  }, [data, isImage]);
+
+  if (!data) return null;
+  if (isImage) return <img src={data} width={240} height={240} style={{ display: 'block', border: '2px solid #000' }} />;
+  return <canvas ref={canvasRef} style={{ display: 'block', border: '2px solid #000' }} />;
 }
 
 function Field({ label, value, onChange, placeholder, mono }) {
@@ -130,7 +113,7 @@ export function ConnectFlow({ nav, route }) {
     const linked = netState.connected;
     return (
       <React.Fragment>
-        <StatusBar label={meta.label + " bridge"} />
+        
         <Header title={meta.label} sub="via Beeper bridge" onBack={() => nav("settings")} />
         <div className="body">
           <div className="contact-hero" style={{ gap: 18 }}>
@@ -165,7 +148,7 @@ export function ConnectFlow({ nav, route }) {
   if (step === "config") {
     return (
       <React.Fragment>
-        <StatusBar label={meta.label + " bridge"} />
+        
         <Header title="Beeper bridge" sub={"Link " + meta.label} onBack={() => setStep("status")} />
         <div className="body">
           <div className="section-pad">
@@ -209,13 +192,22 @@ export function ConnectFlow({ nav, route }) {
   }
 
   if (step === "pair") {
+    const hasRealQr = qr && qr !== "demo";
     return (
       <React.Fragment>
-        <StatusBar label={meta.label + " bridge"} />
-        <Header title="Link a device" sub={meta.label + " companion"} onBack={() => setStep("config")} />
+        <Header title="Scan to link" sub={meta.label} onBack={() => setStep("config")} />
         <div className="body">
           <div className="pair">
-            <FauxQR seed={typeof qr === "string" && qr !== "demo" ? qr : "mudita-kompakt-" + net} />
+            {hasRealQr
+              ? <RealQR data={qr} />
+              : (
+                <div style={{ width: 240, height: 240, border: "2px solid var(--ink)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ opacity: .5, fontSize: "var(--fs-small)" }}>
+                    {busy ? "Requesting QR…" : "QR unavailable"}
+                  </span>
+                </div>
+              )
+            }
             <ol className="pair__steps">
               {meta.steps.map((st, i) => (
                 <li key={i}>{st[0]}<b>{st[1]}</b>{st[2]}</li>
@@ -226,15 +218,8 @@ export function ConnectFlow({ nav, route }) {
               : <React.Fragment>
                 <div className="reach-pill no">
                   <Icon.Close size={18} />
-                  <span>Beeper Desktop not reachable from this preview</span>
+                  <span>Beeper Desktop not reachable — check proxy is running</span>
                 </div>
-                <p style={{ margin: "0", fontSize: "var(--fs-micro)", opacity: .75, lineHeight: 1.5, textAlign: "center" }}>
-                  In a real install this code links your account. Continue in demo mode to
-                  explore the connected experience.
-                </p>
-                <button className="btn btn--solid" onClick={demoLink}>
-                  <Icon.Check size={20} /> Simulate successful link
-                </button>
               </React.Fragment>}
           </div>
         </div>
@@ -244,7 +229,7 @@ export function ConnectFlow({ nav, route }) {
 
   return (
     <React.Fragment>
-      <StatusBar label={meta.label + " bridge"} />
+      
       <Header title={meta.label} sub="Bridge connected" onBack={() => nav("settings")} />
       <div className="body">
         <div className="contact-hero" style={{ gap: 18 }}>
@@ -259,7 +244,7 @@ export function ConnectFlow({ nav, route }) {
             <Row k="Account" v={acctVal(netState.account) || "—"} />
             <Row k="Bridge" v={"Beeper · " + meta.bridge} />
             <Row k="Calls" v="On your phone (not bridged)" />
-            <Row k="Data" v={s.demo ? "Demo (API not reachable)" : "Live"} />
+            <Row k="Data" v={s.reachable ? "Live" : "Offline (proxy not reachable)"} />
             <Row k="Last sync" v={s.lastSync ? new Date(s.lastSync).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"} />
           </div>
           <p style={{ margin: 0, fontSize: "var(--fs-small)", lineHeight: 1.5, opacity: .85 }}>
