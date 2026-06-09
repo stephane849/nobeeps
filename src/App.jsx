@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useTweaks, TweaksPanel, TweakSection, TweakToggle, TweakRadio } from './TweaksPanel';
 import { ChatList } from './screens/ChatList';
 import { Contacts } from './screens/Contacts';
@@ -10,8 +10,7 @@ import { Compose } from './screens/Compose';
 import { VoicePlayback } from './screens/VoicePlayback';
 import { Call } from './screens/Call';
 import { ConnectFlow } from './screens/ConnectFlow';
-
-window.__sent = window.__sent || {};
+import { initNotifications, startMessagePolling, stopMessagePolling } from './notifications';
 
 const isNative = typeof window !== 'undefined' && window?.Capacitor?.isNativePlatform?.() === true;
 
@@ -28,11 +27,6 @@ export default function App() {
     window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   const nav = useCallback((name, params = {}) => {
-    if (window.__pendingSend) {
-      const { id, text } = window.__pendingSend;
-      (window.__sent[id] = window.__sent[id] || []).push({ from: "me", t: "14:03", text });
-      window.__pendingSend = null;
-    }
     setRoute({ name, params });
     if (tweaks.flash && !reduceMotion) {
       const k = Date.now();
@@ -40,6 +34,14 @@ export default function App() {
       setTimeout(() => setFlashKey(cur => cur === k ? 0 : cur), 300);
     }
   }, [tweaks.flash, reduceMotion]);
+
+  useEffect(() => {
+    if (isNative) {
+      initNotifications();
+      startMessagePolling(nav);
+      return stopMessagePolling;
+    }
+  }, [nav]);
 
   const t = tweaks;
   const setT = (k, v) => setTweak(k, v);

@@ -169,12 +169,24 @@ export function ConnectFlow({ nav, route }) {
         <Header title="Beeper bridge" sub={"Link " + meta.label} onBack={() => setStep("status")} />
         <div className="body">
           <div className="section-pad">
+            <details style={{ marginBottom: 16 }}>
+              <summary style={{ cursor: "pointer", fontSize: "var(--fs-small)", fontWeight: 700, paddingBottom: 8 }}>
+                How to set this up
+              </summary>
+              <ol style={{ margin: "8px 0 0", padding: "0 0 0 18px", fontSize: "var(--fs-micro)", lineHeight: 1.7, opacity: .85 }}>
+                <li>On your <b>computer</b>, open a terminal in the app folder and run: <code>node proxy.js</code></li>
+                <li>Note the IP address printed (e.g. <code>192.168.1.x</code>)</li>
+                <li>Enter <code>http://[that-IP]:23374</code> below and tap Check connection</li>
+              </ol>
+              <p style={{ margin: "8px 0 0", fontSize: "var(--fs-micro)", opacity: .7, lineHeight: 1.5 }}>
+                Beeper Desktop only listens on localhost. The proxy.js script relays it over your WiFi so your phone can reach it.
+              </p>
+            </details>
             <p style={{ margin: 0, fontSize: "var(--fs-small)", lineHeight: 1.5, opacity: .85 }}>
-              Point this client at your running <b>Beeper Desktop</b> (or Beeper Server).
-              The default local endpoint is <code>{Beeper.DEFAULT_BASE}</code>.
+              Point this client at your running <b>Beeper Desktop</b> via the proxy.
             </p>
             <Field label="Beeper API endpoint" value={baseUrl} onChange={setBaseUrl}
-              placeholder={Beeper.DEFAULT_BASE} mono />
+              placeholder="http://192.168.x.x:23374" mono />
             <Field label="Access token (optional)" value={token} onChange={setToken}
               placeholder="Bearer token from Beeper Desktop" mono />
             <button className="btn" onClick={check}>

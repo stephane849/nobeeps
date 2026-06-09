@@ -2,35 +2,53 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Icon } from '../icons';
 import { StatusBar, Header, Wave } from '../ui';
 import { DATA } from '../data';
+import { Beeper, poll } from '../beeper';
 
 export function Thread({ nav, route, t }) {
   const id = route.params.id;
   const c = DATA.byId[id];
-  const base = DATA.THREADS[id] || [{ day: "Today" }];
-  window.__sent = window.__sent || {};
-  const [extra, setExtra] = useState((window.__sent && window.__sent[id]) || []);
+  const [msgs, setMsgs] = useState(null);
+  const [failedIds, setFailedIds] = useState(new Set());
   const bodyRef = useRef(null);
-  const msgs = base.concat(extra);
+
+  useEffect(() => {
+    let alive = true;
+    let loaded = false;
+    const stop = poll(async () => {
+      const live = await Beeper.getMessages(id);
+      if (!alive) return;
+      if (live) {
+        setMsgs(live);
+      } else if (!loaded) {
+        setMsgs(DATA.THREADS[id] || [{ day: "Today" }]);
+      }
+      loaded = true;
+    }, 5000);
+    return () => { alive = false; stop(); };
+  }, [id]);
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
-  }, [extra.length]);
+  }, [msgs?.length]);
 
-  function send(text) {
+  async function send(text) {
     if (!text || !text.trim()) return;
-    const m = { from: "me", t: "14:03", text: text.trim() };
-    (window.__sent[id] = window.__sent[id] || []).push(m);
-    setExtra(e => e.concat([m]));
+    const tempId = "tmp-" + Date.now();
+    const m = { id: tempId, from: "me", t: Beeper.now(), text: text.trim() };
+    setMsgs(prev => (prev || []).concat([m]));
+    const ok = await Beeper.send(id, text.trim());
+    if (!ok) setFailedIds(s => new Set(s).add(tempId));
   }
 
+  const rows = msgs || [];
   const quick = ["On my way ☺", "Call you at 16:30", "Thank you", "Not right now"];
 
   return (
     <React.Fragment>
       <StatusBar label="" />
       <Header
-        title={c.name}
-        sub={t.noReceipts ? (c.group ? c.num : "Reply when you can") : "online"}
+        title={c ? c.name : id}
+        sub={t.noReceipts ? (c?.group ? c?.num : "Reply when you can") : "online"}
         onBack={() => nav("list")}
         right={
           <React.Fragment>
@@ -41,19 +59,20 @@ export function Thread({ nav, route, t }) {
       />
       <div className="body" ref={bodyRef}>
         <div className={"thread" + (t.flat ? " flat" : "")}>
-          {msgs.map((m, i) => {
+          {rows.map((m, i) => {
             if (m.day) return <div className="daystamp" key={"d" + i}>{m.day}</div>;
             const me = m.from === "me";
+            const failed = m.id && failedIds.has(m.id);
             return (
-              <div className={"msg" + (me ? " me" : "")} key={i}>
-                {t.flat && <span className="msg__author">{me ? "You" : (m.author || c.name.split(" ")[0])}</span>}
+              <div className={"msg" + (me ? " me" : "")} key={m.id || i}>
+                {t.flat && <span className="msg__author">{me ? "You" : (m.author || c?.name?.split(" ")[0])}</span>}
                 <div className="msg__bubble">
                   {m.kind === "voice"
-                    ? <VoiceBubble dur={m.dur} onOpen={() => nav("voice", { id, dur: m.dur, from: me ? "You" : c.name })} />
+                    ? <VoiceBubble dur={m.dur} onOpen={() => nav("voice", { id, dur: m.dur, from: me ? "You" : c?.name, audioUrl: m.audioUrl })} />
                     : m.text}
                 </div>
                 <span className="msg__meta">
-                  {m.t}{me && !t.noReceipts ? " · delivered" : ""}
+                  {m.t}{me && !t.noReceipts ? " · delivered" : ""}{failed ? " · ✕ failed" : ""}
                 </span>
               </div>
             );

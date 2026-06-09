@@ -2,18 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { Icon } from '../icons';
 import { StatusBar, Header, Avatar, NetTag } from '../ui';
 import { DATA } from '../data';
-import { useBeeper, Beeper } from '../beeper';
+import { useBeeper, Beeper, poll } from '../beeper';
 
 export function ChatList({ nav, t }) {
   const bridge = useBeeper();
   const [live, setLive] = useState(null);
 
   useEffect(() => {
+    if (!bridge.connected) { setLive(null); return; }
     let alive = true;
-    if (bridge.connected) {
-      Beeper.getChats().then(arr => { if (alive && arr) setLive(arr); });
-    } else { setLive(null); }
-    return () => { alive = false; };
+    const stop = poll(async () => {
+      const arr = await Beeper.getChats();
+      if (alive && arr) setLive(arr);
+    }, 10000);
+    return () => { alive = false; stop(); };
   }, [bridge.connected]);
 
   let rows = live || DATA.CHATS.map(c => {
