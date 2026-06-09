@@ -34,6 +34,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build proxy.exe (standalone, no Node required)
+        run: npx pkg proxy.js --targets node18-win-x64 --output proxy-windows.exe
+
       - name: Build web app
         run: npm run build
 
@@ -77,18 +80,28 @@ jobs:
           tag_name: build-${{ github.run_number }}
           name: "Build ${{ github.run_number }}"
           body: |
-            Automated build from commit ${{ github.sha }}
-
-            ## Install
-            Download `app-debug.apk` below and install it on your device.
+            ## Install the app
+            Download `app-debug.apk` and install it on your Android device.
             Enable "Install unknown apps" in Android settings if prompted.
 
-            ## Beeper bridge setup
-            1. Install [Beeper](https://www.beeper.com/) on your desktop or server
-            2. Open the app → Settings → WhatsApp or Telegram → Connect
-            3. Enter your Beeper API endpoint (default: `http://127.0.0.1:23373`)
-            4. Scan the QR code with your phone
-          files: android/app/build/outputs/apk/debug/app-debug.apk
+            ## Run the proxy on your Windows laptop (no Node.js needed)
+            1. Download `proxy-windows.exe` below
+            2. Double-click it — a terminal opens and prints your IP address
+            3. In the app → Settings → WhatsApp or Telegram → Connect
+            4. Enter the URL shown (e.g. `http://192.168.1.x:23374`)
+            5. Scan the QR code with WhatsApp/Telegram on your phone
+
+            **Keep the proxy window open while using the app.**
+
+            ## Alternative: Python proxy
+            If you have Python installed, download `proxy.py` and run:
+            ```
+            python proxy.py
+            ```
+          files: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            proxy-windows.exe
+            proxy.py
           generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
