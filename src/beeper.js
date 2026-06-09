@@ -33,6 +33,7 @@ function routePath(name, net, id) {
     case "login":       return `/v0/accounts/${net}/login`;
     case "loginStatus": return `/v0/accounts/${net}/login/${encodeURIComponent(id)}`;
     case "chats":       return "/v0/chats?limit=60";
+    case "messages":    return `/v0/chats/${encodeURIComponent(id)}/messages`;
     case "send":        return `/v0/chats/${encodeURIComponent(id)}/messages`;
     case "logout":      return `/v0/accounts/${net}`;
     default:            return "/v0/health";
@@ -90,6 +91,8 @@ async function req(path, opts = {}, timeout = 4000) {
   } catch (e) { clearTimeout(to); throw e; }
 }
 
+// ── connection lifecycle ────────────────────────────────────────────────────
+
 async function ping() {
   try { await req(routePath("health"), { method: "GET" }, 3500); setState({ reachable: true }); return true; }
   catch (e) { setState({ reachable: false }); return false; }
@@ -118,6 +121,8 @@ async function disconnect(net) {
   setNet(net, { connected: false, account: null });
 }
 
+// ── chat list ───────────────────────────────────────────────────────────────
+
 function mapChat(c) {
   return {
     id: c.id || c.chat_id,
@@ -140,9 +145,64 @@ async function getChats() {
       const arr = (r.chats || r.items || r || []).map(mapChat)
         .filter(c => !c.network || snap.connectedNets.includes(c.network));
       if (arr.length) { setState({ lastSync: Date.now() }); return arr; }
-    } catch (e) { /* fall through to demo */ }
+    } catch (e) { /* fall through */ }
   }
   return null;
+}
+
+// ── message thread ──────────────────────────────────────────────────────────
+
+function now() {
+  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function mapMessage(m) {
+  // Normalise various Beeper API message shapes to local format
+  const sender = m.sender_id || m.sender || m.from_id || "";
+  const isMe = sender === "me" || m.is_outgoing || m.outgoing || false;
+  const text = m.text || m.body || m.content || "";
+  const ts = m.timestamp || m.created_at || m.sent_at || null;
+  const timeStr = ts
+    ? new Date(typeof ts === "number" ? ts * 1000 : ts)
+        .toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : now();
+  const isVoice = m.type === "audio" || m.type === "voice" || m.mime_type?.startsWith("audio/");
+  const audioUrl = m.audio_url || m.media_url || (isVoice && m.url) || null;
+  const dur = m.duration_label || (m.duration ? formatDur(m.duration) : null);
+  return {
+    id:       m.id || m.message_id || null,
+    from:     isMe ? "me" : (sender || "them"),
+    author:   m.sender_name || m.author || null,
+    t:        timeStr,
+    text:     isVoice ? null : text,
+    kind:     isVoice ? "voice" : undefined,
+    dur:      isVoice ? (dur || "0:30") : undefined,
+    audioUrl: audioUrl || undefined,
+  };
+}
+
+function formatDur(seconds) {
+  const s = Math.round(seconds);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+async function getMessages(chatId, limit = 60) {
+  const snap = snapshot();
+  if (!snap.connected || !state.reachable) return null;
+  try {
+    const path = routePath("messages", null, chatId) + `?limit=${limit}`;
+    const r = await req(path, { method: "GET" }, 6000);
+    const raw = r.messages || r.items || (Array.isArray(r) ? r : null);
+    if (!raw) return null;
+    setState({ lastSync: Date.now() });
+    return raw.map(mapMessage);
+  } catch (e) {
+    return null;
+  }
+}
+
+function getAudioUrl(messageId) {
+  return urlFor(`/v0/messages/${encodeURIComponent(messageId)}/audio`);
 }
 
 async function send(chatId, text) {
@@ -155,13 +215,24 @@ async function send(chatId, text) {
   return false;
 }
 
+// ── polling helper ──────────────────────────────────────────────────────────
+
+export function poll(fn, intervalMs) {
+  fn(); // run immediately
+  const id = setInterval(fn, intervalMs);
+  return () => clearInterval(id);
+}
+
+// ── subscription ────────────────────────────────────────────────────────────
+
 function subscribe(fn) { listeners.add(fn); fn(snapshot()); return () => listeners.delete(fn); }
 
 export const Beeper = {
   DEFAULT_BASE, NETWORKS, NET_IDS,
   get state() { return snapshot(); },
   setConfig: (patch) => setState(patch),
-  subscribe, ping, startLogin, loginStatus, markLinked, disconnect, getChats, send,
+  subscribe, ping, startLogin, loginStatus, markLinked, disconnect,
+  getChats, getMessages, getAudioUrl, send, now,
 };
 
 export function useBeeper() {
