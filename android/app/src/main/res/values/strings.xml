@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Mudita Kompakt</string>
+    <string name="title_activity_main">Mudita Kompakt</string>
+    <string name="package_name">com.mudita.kompakt</string>
+    <string name="custom_url_scheme">com.mudita.kompakt</string>
+</resources>
